@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.3.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+
+	<!-- 扫包 -->
+	<context:component-scan base-package="com.ekertree.crud"></context:component-scan>
+	
+	<!-- 配置Thymeleaf视图解析器 -->
+	<bean id="viewResolver" class="org.thymeleaf.spring5.view.ThymeleafViewResolver">
+	    <property name="order" value="1"/>
+	    <property name="characterEncoding" value="UTF-8"/>
+	    <property name="templateEngine">
+	        <bean class="org.thymeleaf.spring5.SpringTemplateEngine">
+	            <property name="templateResolver">
+	                <bean class="org.thymeleaf.spring5.templateresolver.SpringResourceTemplateResolver">
+	    
+	                    <!-- 视图前缀 -->
+	                    <property name="prefix" value="/WEB-INF/views/"/>
+	    
+	                    <!-- 视图后缀 -->
+	                    <property name="suffix" value=".html"/>
+	                    <property name="templateMode" value="HTML"/>
+	                    <property name="characterEncoding" value="UTF-8" />
+	                </bean>
+	            </property>
+	        </bean>
+	    </property>
+	</bean>
+	<!-- 将springmvc不能处理的请求交给tomcat -->
+	<mvc:default-servlet-handler/>
+	<!-- 开启注解驱动 -->
+	<mvc:annotation-driven></mvc:annotation-driven>
+	
+	<!-- 配置数据连接池 -->
+	<context:property-placeholder location="classpath:jdbc.properties"/>
+	<bean id="druidDataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <!-- 基本属性 url、user、password -->
+        <property name="driverClassName" value="${jdbc.driverClass}"/>
+        <property name="url" value="${jdbc.url}"/>
+        <property name="username" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+ 
+        <!-- 配置监控统计拦截的filters -->
+        <property name="filters" value="stat"/>
+ 
+        <!-- 配置初始化大小、最小、最大 -->
+        <property name="maxActive" value="20"/>
+        <property name="initialSize" value="1"/>
+        <property name="minIdle" value="1"/>
+ 
+        <!-- 配置获取连接等待超时的时间 -->
+        <property name="maxWait" value="60000"/>
+ 
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="60000"/>
+ 
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="300000"/>
+ 
+        <property name="testWhileIdle" value="true"/>
+        <property name="testOnBorrow" value="false"/>
+        <property name="testOnReturn" value="false"/>
+ 
+        <!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+        <property name="poolPreparedStatements" value="true"/>
+        <property name="maxOpenPreparedStatements" value="20"/>
+    </bean>
+    
+    <!-- 配置整合Mybatis -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+    	<property name="configLocation" value="classpath:mybatis-config.xml"></property>
+    	<property name="dataSource" ref="druidDataSource"></property>
+    	<!-- 指定mapper文件的位置 -->
+    	<property name="mapperLocations" value="classpath:com/ekertree/crud/dao/*.xml"></property>
+    </bean>
+    <!-- 注入mybatis -->
+    <bean id="mapperScannerConfigurer" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+    	<property name="basePackage" value="com.ekertree.crud.dao"></property>
+    </bean>
+    
+    <!-- 事务控制 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+    	<!-- 控制数据源 -->
+    	<property name="dataSource" ref="druidDataSource"></property>
+    </bean>
+    
+    <!-- 开启基于注解的事务 比较重要的使用xml配置 -->
+    <aop:config>
+    	<!-- 切入点表达式 -->
+    	<aop:pointcut expression="execution(* com.ekertree.crud.service.*.*(..))" id="txPoint"/>
+    	<!-- 事务增强配置 -->
+    	<aop:advisor advice-ref="txAdvice" pointcut-ref="txPoint"/>
+    </aop:config>
+    <!-- 配置事务增强 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+    	<tx:attributes>
+    		<!-- 所有方法都是事务方法 -->
+    		<tx:method name="*"/>
+    		<!-- get开始的所有方法 -->
+    		<tx:method name="get*" read-only="true"/>
+    	</tx:attributes>
+    </tx:advice>
+    
+   <!-- 配置一个可以执行批量的sqlseseion -->
+   <bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+   		<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactory"></constructor-arg>
+   		<constructor-arg name="executorType" value="BATCH"></constructor-arg>
+   </bean>
+   
+   <mvc:view-controller path="/" view-name="index"/>
+</beans>
